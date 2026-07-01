@@ -246,31 +246,6 @@
 
 
 
-<!-- FOR DEVELOPERS -->
-<section class="card code-snippet">
-  <h2 style="margin-top: 0;">Bygg ovanpå</h2>
-  <p class="muted">Tre sätt att komma åt datan:</p>
-
-  <h3>Webbläsare</h3>
-  <p><a href="/browse">/browse</a> — sök, filtrera, klicka för detaljer.</p>
-
-  <h3>REST API</h3>
-  <pre><code>curl https://&lt;host&gt;/api/tenders?source=mercell&q=it-konsult</code></pre>
-  <p><a href="/agenter">Full API-dokumentation →</a></p>
-
-  <h3>MCP (för AI-agenter)</h3>
-  <pre><code>{
-  "mcpServers": {
-    "opentender": {
-      "command": "python",
-      "args": ["-m", "mcp_server"],
-      "cwd": "/path/to/opentender"
-    }
-  }
-}</code></pre>
-  <p><a href="https://github.com/magnusfroste/opentender/blob/main/MCP.md" target="_blank" rel="noopener">MCP-setup-guide ↗</a></p>
-</section>
-
 
 <!-- MINI INSIGHT (links to dashboard) -->
 {% if top_authorities %}
