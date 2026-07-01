@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}{{ t.title or "Upphandling" }}{% endblock %}
+
+{% block content %}
+<div class="detail-layout">
+  <!-- BREADCRUMB -->
+  <nav class="breadcrumb">
+    <a href="/browse">Browse</a>
+    <span class="sep">/</span>
+    <span>{{ t.source_system }}</span>
+    <span class="sep">/</span>
+    <span class="current">#{{ t.id }}</span>
+  </nav>
+
+  <!-- HERO -->
+  <div class="detail-hero {% if t.days_until is not none and t.days_until < 0 %}closed{% elif t.days_until is not none and t.days_until <= 7 %}closing{% else %}open{% endif %}">
+    <div class="detail-hero-status">
+      {% if t.days_until is not none %}
+        {% if t.days_until < 0 %}
+        <span class="status-badge status-closed">🔒 Stängd</span>
+        <span class="status-time">Stängdes för {{ abs(t.days_until) }} dagar sedan</span>
+        {% elif t.days_until == 0 %}
+        <span class="status-badge status-urgent">⚠️ Stänger idag!</span>
+        {% elif t.days_until <= 3 %}
+        <span class="status-badge status-urgent">⚠️ {{ t.days_until }} dagar kvar</span>
+        {% elif t.days_until <= 7 %}
+        <span class="status-badge status-soon">⏳ {{ t.days_until }} dagar kvar</span>
+        {% else %}
+        <span class="status-badge status-open">✅ Öppen — {{ t.days_until }} dagar kvar</span>
+        {% endif %}
+      {% else %}
+      <span class="status-badge status-open">✅ Öppen</span>
+      <span class="status-time">Ingen deadline angiven</span>
+      {% endif %}
+    </div>
+
+    <h1>{{ t.title or "(utan titel)" }}</h1>
+
+    <div class="detail-hero-meta">
+      <div class="detail-meta-item">
+        <span class="label">Upphandlare</span>
+        <a href="/browse?authority={{ t.authority }}" class="value">{{ t.authority or "—" }}</a>
+      </div>
+      <div class="detail-meta-item">
+        <span class="label">Region</span>
+        <span class="value">{{ t.region or "Sverige" }}</span>
+      </div>
+      <div class="detail-meta-item">
+        <span class="label">Källa</span>
+        <a href="/browse?source={{ t.source_system }}" class="value">{{ t.source_system }}</a>
+      </div>
+      {% if t.value %}
+      <div class="detail-meta-item">
+        <span class="label">Värde</span>
+        <span class="value">{{ "{:,}".format(t.value).replace(",", " ") }} SEK</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- KEY DATES -->
+  <div class="detail-section">
+    <h2>Tidsplan</h2>
+    <div class="detail-dates">
+      <div class="date-card">
+        <span class="label">Publicerad</span>
+        <span class="value">{{ t.published_at[:10] if t.published_at else "—" }}</span>
+      </div>
+      <div class="date-card {% if t.days_until is not none and t.days_until <= 7 and t.days_until >= 0 %}urgent{% endif %}">
+        <span class="label">Deadline</span>
+        <span class="value">{{ t.deadline[:10] if t.deadline else "—" }}</span>
+        {% if t.days_until is not none and t.days_until >= 0 %}
+        <span class="countdown">{{ t.days_until }} dagar kvar</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- DESCRIPTION -->
+  {% if t.description %}
+  <div class="detail-section">
+    <h2>Beskrivning</h2>
+    <div class="detail-description">{{ t.description }}</div>
+  </div>
+  {% endif %}
+
+  <!-- CLASSIFICATION -->
+  <div class="detail-section">
+    <h2>Klassificering</h2>
+    <div class="detail-classification">
+      {% if t.cpv_codes_list %}
+      <div class="class-group">
+        <span class="label">CPV-koder</span>
+        <div class="chips">
+          {% for cpv in t.cpv_codes_list %}
+          <span class="chip chip-cpv" title="CPV {{ cpv }}">{{ cpv }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if t.procedure %}
+      <div class="class-group">
+        <span class="label">Procedur</span>
+        <span class="chip">{{ t.procedure }}</span>
+      </div>
+      {% endif %}
+      {% if t.contract_type %}
+      <div class="class-group">
+        <span class="label">Avtalstyp</span>
+        <span class="chip">{{ t.contract_type }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="detail-section">
+    <h2>Åtgärder</h2>
+    <div class="detail-actions">
+      {% if t.tender_url %}
+      <a href="{{ t.tender_url }}" target="_blank" rel="noopener" class="btn primary large">
+        Gå till originalannons →
+      </a>
+      {% endif %}
+      
+      <button class="btn ghost" onclick="navigator.clipboard.writeText(window.location.href); this.textContent='Kopierad!';">
+        Kopiera länk
+      </button>
+    </div>
+    <p class="muted detail-paywall-note">
+      {% if t.source_system == 'ted' %}
+      ✅ TED EU är helt publikt — inget konto krävs för att se dokument.
+      {% else %}
+      ⚠️ Att ansöka kan kräva konto hos plattformen (Mercell, Tendsign, etc.). Klicka "Gå till originalannons" för att komma åt anbudsformulär och dokument.
+      {% endif %}
+    </p>
+  </div>
+
+  <!-- RAW DATA (collapsible) -->
+  <details class="detail-raw">
+    <summary>Rådata (JSON)</summary>
+    <pre><code>{{ t.raw_json_pretty }}</code></pre>
+  </details>
+</div>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — insikter{% endblock %}
+
+{% block content %}
+<h1>Insikter</h1>
+<p class="sub">Vad händer i svensk offentlig upphandling just nu?</p>
+
+<!-- KPIs -->
+<section class="insight-kpis">
+  <div class="insight-kpi">
+    <div class="v">{{ "{:,}".format(total).replace(",", " ") }}</div>
+    <div class="l">Upphandlingar totalt</div>
+  </div>
+  <div class="insight-kpi green">
+    <div class="v">{{ open_count }}</div>
+    <div class="l">Öppna just nu</div>
+  </div>
+  {% if total_value %}
+  <div class="insight-kpi">
+    <div class="v">{{ format_money(total_value) }}</div>
+    <div class="l">Totalt värde (uppskattat)</div>
+  </div>
+  {% endif %}
+  {% if biggest %}
+  <div class="insight-kpi highlight">
+    <div class="v">{{ format_money(biggest.value) }}</div>
+    <div class="l">Största: {{ biggest.authority[:25] }}</div>
+  </div>
+  {% endif %}
+  {% if closing_soon %}
+  <div class="insight-kpi urgent">
+    <div class="v">{{ closing_soon.days }}d</div>
+    <div class="l">Snabbast stängande: {{ closing_soon.title[:30] }}</div>
+  </div>
+  {% endif %}
+  <div class="insight-kpi">
+    <div class="v">{{ authority_count }}</div>
+    <div class="l">Aktiva upphandlare</div>
+  </div>
+</section>
+
+<!-- TOP 10 UPPHANDLARE -->
+<section class="insight-section">
+  <h2>Top 10 upphandlare</h2>
+  <p class="muted">Vem upphandlar mest?</p>
+  <div class="bar-chart">
+    {% for a in top_authorities %}
+    <div class="bar-row">
+      <span class="bar-label">{{ a.authority[:30] }}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width: {{ a.pct }}%"></div>
+        <span class="bar-value">{{ a.n }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- BRANSCHFÖRDELNING -->
+{% if cpv_top %}
+<section class="insight-section">
+  <h2>Branschfördelning</h2>
+  <p class="muted">Vilka kategorier upphandlas mest? (CPV-huvudkategorier)</p>
+  <div class="donut-chart">
+    <div class="donut" style="background: conic-gradient({% set ns = namespace(cumulative=0) %}{% for c in cpv_top %}{{ c.color }} {{ ns.cumulative }}% {{ ns.cumulative + c.pct }}%{% set ns.cumulative = ns.cumulative + c.pct %}{% if not loop.last %}, {% endif %}{% endfor %}{% if ns.cumulative < 100 %}, var(--surface-2) {{ ns.cumulative }}% 100%{% endif %})">
+      <div class="donut-center">
+        <span class="donut-total">{{ total }}</span>
+        <span class="donut-label">totalt</span>
+      </div>
+    </div>
+    <div class="donut-legend">
+      {% for c in cpv_top %}
+      <div class="legend-item">
+        <span class="legend-dot" style="background: {{ c.color }}"></span>
+        <span class="legend-label">{{ c.name }}</span>
+        <span class="legend-value">{{ c.n }} ({{ c.pct }}%)</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- DEADLINE FÖRDELNING -->
+{% if deadline_weekday %}
+<section class="insight-section">
+  <h2>När stänger anbud?</h2>
+  <p class="muted">Vilken veckodag har flest deadlines?</p>
+  <div class="weekday-chart">
+    {% for d in deadline_weekday %}
+    <div class="weekday-col">
+      <div class="weekday-bar" style="height: {{ d.pct }}%"></div>
+      <span class="weekday-label">{{ d.day }}</span>
+      <span class="weekday-count">{{ d.n }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<!-- SENASTE UPPHANDLINGAR -->
+<section class="insight-section">
+  <div class="flex between items-center mb-2">
+    <h2 style="margin: 0;">Senaste upphandlingar</h2>
+    <a href="/browse?sort=newest" class="muted">Visa alla →</a>
+  </div>
+  <div class="cards">
+    {% for t in recent_tenders %}
+    <a class="card-tender" href="/tenders/{{ t.id }}">
+      <div class="top-row">
+        <h3>{{ t.title or "(utan titel)" }}</h3>
+        {% if t.days_until is not none %}
+          {% if t.days_until < 0 %}<span class="badge badge-closed">Stängd</span>
+          {% elif t.days_until <= 3 %}<span class="badge badge-urgent">⚠️ {{ t.days_until }}d</span>
+          {% else %}<span class="badge badge-open">{{ t.days_until }}d</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="meta">
+        <span>🏛️ {{ t.authority or "—" }}</span>
+        <span class="badge badge-source">{{ t.source_system }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}

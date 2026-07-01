@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block title %}Browse — upphandlingar{% endblock %}
+
+{% block content %}
+<div class="browse-layout">
+  <!-- SIDEBAR FILTERS -->
+  <aside class="browse-filters" id="filters">
+    <h2 class="filter-title">Filter</h2>
+
+    <div class="filter-group">
+      <label for="f-q">Sök</label>
+      <input type="text" id="f-q" name="q" value="{{ q }}" placeholder="IT-konsult, solcell, städning..." class="filter-input" autocomplete="off" />
+    </div>
+
+    <div class="filter-group">
+      <label for="f-source">Källa</label>
+      <select id="f-source" name="source" class="filter-input">
+        <option value="">Alla källor</option>
+        {% for s in sources %}
+        <option value="{{ s.source_system }}" {% if source == s.source_system %}selected{% endif %}>{{ s.source_system }} ({{ s.count }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="f-authority">Upphandlare</label>
+      <input type="text" id="f-authority" name="authority" value="{{ authority }}" placeholder="t.ex. Trafikverket" class="filter-input" />
+    </div>
+
+    <div class="filter-group">
+      <label for="f-cpv">CPV-kod</label>
+      <input type="text" id="f-cpv" name="cpv" value="{{ cpv }}" placeholder="t.ex. 72 (IT), 45 (bygg)" class="filter-input" />
+    </div>
+
+    <div class="filter-group">
+      <label for="f-status">Status</label>
+      <select id="f-status" name="status" class="filter-input">
+        <option value="open" {% if status == 'open' or not status %}selected{% endif %}>Öppna</option>
+        <option value="all" {% if status == 'all' %}selected{% endif %}>Alla (även stängda)</option>
+        <option value="closing" {% if status == 'closing' %}selected{% endif %}>Stänger snart (≤7 dagar)</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="f-sort">Sortera efter</label>
+      <select id="f-sort" name="sort" class="filter-input">
+        <option value="deadline" {% if sort == 'deadline' or not sort %}selected{% endif %}>Deadline (närmast först)</option>
+        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Senast publicerad</option>
+        <option value="value" {% if sort == 'value' %}selected{% endif %}>Värde (högst först)</option>
+        <option value="title" {% if sort == 'title' %}selected{% endif %}>Titel (A-Ö)</option>
+      </select>
+    </div>
+
+    <button class="btn primary" id="apply-filters">Tillämpa</button>
+    <a href="/browse" class="btn ghost" id="reset-filters">Återställ</a>
+  </aside>
+
+  <!-- MAIN RESULTS -->
+  <div class="browse-main">
+    <div class="browse-header">
+      <h1 style="margin: 0;">Upphandlingar</h1>
+      <span class="muted">{{ total }} träffar{% if q %} för "{{ q }}"{% endif %}</span>
+      <div class="browse-actions">
+        <button class="btn ghost small" id="export-csv" title="Ladda ner som CSV">CSV</button>
+        <button class="btn ghost small" id="export-json" title="Ladda ner som JSON">JSON</button>
+      </div>
+    </div>
+
+    {% if tenders %}
+    <div class="tender-list">
+      {% for t in tenders %}
+      <a class="tender-card" href="/tenders/{{ t.id }}">
+        <div class="tender-card-header">
+          <h3 class="tender-title">{{ t.title or "(utan titel)" }}</h3>
+          {% if t.days_until is not none %}
+            {% if t.days_until < 0 %}
+            <span class="badge badge-closed">Stängd</span>
+            {% elif t.days_until <= 3 %}
+            <span class="badge badge-urgent">⚠️ {{ t.days_until }}d kvar</span>
+            {% elif t.days_until <= 7 %}
+            <span class="badge badge-soon">{{ t.days_until }}d kvar</span>
+            {% else %}
+            <span class="badge badge-open">{{ t.days_until }}d kvar</span>
+            {% endif %}
+          {% else %}
+          <span class="badge badge-unknown">Ingen deadline</span>
+          {% endif %}
+        </div>
+
+        <div class="tender-card-body">
+          <div class="tender-meta-row">
+            <span class="tender-meta-item">
+              <svg class="icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>
+              {{ t.authority or "—" }}
+            </span>
+            <span class="tender-meta-item">
+              <svg class="icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              {{ t.region or "Sverige" }}
+            </span>
+          </div>
+
+          <div class="tender-meta-row">
+            {% if t.value %}
+            <span class="tender-meta-item">
+              <svg class="icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              {{ "{:,}".format(t.value).replace(",", " ") }} SEK
+            </span>
+            {% endif %}
+            <span class="tender-meta-item">
+              <svg class="icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Deadline: {{ t.deadline[:10] if t.deadline else "—" }}
+            </span>
+            <span class="tender-meta-item">
+              <svg class="icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Publicerad: {{ t.published_at[:10] if t.published_at else "—" }}
+            </span>
+          </div>
+
+          <div class="tender-meta-row">
+            <span class="badge badge-source">{{ t.source_system }}</span>
+            {% if t.procedure %}<span class="chip">{{ t.procedure }}</span>{% endif %}
+            {% for cpv in (t.cpv_codes_list or [])[:3] %}
+            <span class="chip chip-cpv">{{ cpv }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- PAGINATION -->
+    {% if pages > 1 %}
+    <nav class="pagination">
+      {% if page > 1 %}
+      <a href="?{{ qs_prev }}" class="btn ghost">← Föregående</a>
+      {% endif %}
+      <span class="page-info">Sida {{ page }} av {{ pages }}</span>
+      {% if page < pages %}
+      <a href="?{{ qs_next }}" class="btn ghost">Nästa →</a>
+      {% endif %}
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="empty">
+      <div class="icon">🔍</div>
+      <h3>Inga träffar</h3>
+      <p class="muted">Prova bredare sökning eller andra filter.</p>
+      <a href="/browse" class="btn ghost">Återställ filter</a>
+    </div>
+    {% endif %}
+  
+    <!-- DETAIL SLIDE-IN PANEL -->
+    <aside class="detail-panel" id="detail-panel" aria-hidden="true">
+      <div class="detail-panel-header">
+        <button class="detail-panel-close" id="panel-close" aria-label="Stäng">✕</button>
+      </div>
+      <div class="detail-panel-content" id="panel-content">
+        <div class="panel-loading">Laddar...</div>
+      </div>
+    </aside>
+    <div class="detail-panel-overlay" id="panel-overlay" aria-hidden="true"></div>
+
+</div>
+</div>
+
+<script>
+  // === Dynamic filtering ===
+  // Selects: submit on change
+  // Text inputs (search, authority, cpv): debounce 350ms then submit
+  let debounceTimer = null;
+
+  function applyFilters() {
+    const params = new URLSearchParams();
+    const q = document.getElementById('f-q').value.trim();
+    const source = document.getElementById('f-source').value;
+    const authority = document.getElementById('f-authority').value.trim();
+    const cpv = document.getElementById('f-cpv').value.trim();
+    const status = document.getElementById('f-status').value;
+    const sort = document.getElementById('f-sort').value;
+    if (q) params.set('q', q);
+    if (source) params.set('source', source);
+    if (authority) params.set('authority', authority);
+    if (cpv) params.set('cpv', cpv);
+    if (status && status !== 'open') params.set('status', status);
+    if (sort && sort !== 'deadline') params.set('sort', sort);
+    const qs = params.toString();
+    window.location.href = '/browse' + (qs ? '?' + qs : '');
+  }
+
+  // Selects: instant submit
+  document.querySelectorAll('select.filter-input').forEach(el => {
+    el.addEventListener('change', applyFilters);
+  });
+
+  // Text inputs: debounce 350ms
+  document.querySelectorAll('input[type="text"].filter-input').forEach(el => {
+    el.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(applyFilters, 350);
+    });
+    // Submit on Enter immediately
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        clearTimeout(debounceTimer);
+        applyFilters();
+      }
+    });
+  });
+
+  // Apply button (fallback)
+  document.getElementById('apply-filters').addEventListener('click', applyFilters);
+
+  // Export
+  async function exportData(format) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('format', format);
+    const r = await fetch('/api/tenders?' + params.toString());
+    const data = await r.json();
+    // Trigger download
+    const blob = new Blob([format === 'csv' ? toCSV(data.items) : JSON.stringify(data, null, 2)],
+                         {type: format === 'csv' ? 'text/csv' : 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `opentender.${format}`;
+    a.click();
+  }
+
+  function toCSV(items) {
+    if (!items || !items.length) return '';
+    const cols = ['id','title','authority','deadline','value','source_system','region','cpv_codes'];
+    const header = cols.join(',');
+    const rows = items.map(i => cols.map(c => {
+      let v = i[c];
+      if (typeof v === 'object') v = JSON.stringify(v);
+      if (v === null || v === undefined) v = '';
+      return `"${String(v).replace(/"/g, '""')}"`;
+    }).join(','));
+    return [header, ...rows].join('\n');
+  }
+
+  document.getElementById('export-csv')?.addEventListener('click', () => exportData('csv'));
+  document.getElementById('export-json')?.addEventListener('click', () => exportData('json'));
+
+  // === DETAIL PANEL ===
+  const panel = document.getElementById('detail-panel');
+  const overlay = document.getElementById('panel-overlay');
+  const panelContent = document.getElementById('panel-content');
+
+  async function openPanel(id) {
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+    panelContent.innerHTML = '<div class="panel-loading">Laddar...</div>';
+
+    try {
+      const r = await fetch('/api/tenders/' + id);
+      const t = await r.json();
+      const days = t.days_until;
+      let statusBadge = '';
+      if (days !== null && days !== undefined) {
+        if (days < 0) statusBadge = '<span class="status-badge status-closed">Stängd</span>';
+        else if (days <= 3) statusBadge = '<span class="status-badge status-urgent">⚠️ ' + days + 'd kvar</span>';
+        else if (days <= 7) statusBadge = '<span class="status-badge status-soon">' + days + 'd kvar</span>';
+        else statusBadge = '<span class="status-badge status-open">' + days + 'd kvar</span>';
+      } else {
+        statusBadge = '<span class="status-badge status-open">Öppen</span>';
+      }
+
+      const cpvChips = (t.cpv_codes || []).map(c => '<span class="chip chip-cpv">' + c + '</span>').join('');
+      const valueStr = t.value ? (t.value).toLocaleString('sv-SE') + ' SEK' : '—';
+      const paywallNote = t.source_system === 'ted'
+        ? '✅ TED EU är helt publikt — inget konto krävs.'
+        : '⚠️ Att ansöka kan kräva konto hos plattformen.';
+
+      panelContent.innerHTML = `
+        <div class="panel-status">${statusBadge}</div>
+        <h2 class="panel-title">${t.title || '(utan titel)'}</h2>
+        <div class="panel-meta">
+          <div class="panel-meta-item"><span class="label">Upphandlare</span><a href="/browse?authority=${encodeURIComponent(t.authority)}" class="value">${t.authority || '—'}</a></div>
+          <div class="panel-meta-item"><span class="label">Region</span><span class="value">${t.region || 'Sverige'}</span></div>
+          <div class="panel-meta-item"><span class="label">Publicerad</span><span class="value">${(t.published_at || '—').slice(0,10)}</span></div>
+          <div class="panel-meta-item"><span class="label">Deadline</span><span class="value">${(t.deadline || '—').slice(0,10)}</span></div>
+          <div class="panel-meta-item"><span class="label">Värde</span><span class="value">${valueStr}</span></div>
+          <div class="panel-meta-item"><span class="label">Källa</span><span class="value">${t.source_system}</span></div>
+        </div>
+        ${t.description ? '<div class="panel-desc"><h3>Beskrivning</h3><p>' + t.description + '</p></div>' : ''}
+        ${cpvChips ? '<div class="panel-cpv"><span class="label">CPV</span><div class="chips">' + cpvChips + '</div></div>' : ''}
+        <div class="panel-actions">
+          <a href="/tenders/${t.id}" class="btn primary">Öppna full sida →</a>
+          ${t.tender_url ? '<a href="' + t.tender_url + '" target="_blank" rel="noopener" class="btn ghost">Originalannons ↗</a>' : ''}
+        </div>
+        <p class="muted panel-paywall">${paywallNote}</p>
+      `;
+    } catch (e) {
+      panelContent.innerHTML = '<div class="panel-loading">Fel: ' + e + '</div>';
+    }
+  }
+
+  function closePanel() {
+    panel.classList.remove('open');
+    overlay.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+  }
+
+  // Intercept card clicks — open panel instead of navigating
+  document.querySelectorAll('.tender-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      const href = card.getAttribute('href');
+      const id = href.match(/\/tenders\/(\d+)/);
+      if (id) openPanel(id[1]);
+    });
+  });
+
+  document.getElementById('panel-close')?.addEventListener('click', closePanel);
+  overlay?.addEventListener('click', closePanel);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePanel();
+  });
+
+</script>
+{% endblock %}

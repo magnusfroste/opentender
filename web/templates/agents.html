@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Agenter — koppla in din AI{% endblock %}
+
+{% block content %}
+<!-- HERO -->
+<div class="agents-hero">
+  <h1>Agenter</h1>
+  <p class="lead">Tre sätt att använda OpenTender. Välj det som passar dig — eller använd alla tre.</p>
+</div>
+
+<!-- THREE PATHS CARDS -->
+<div class="paths-grid">
+  <a href="#mcp" class="path-card path-primary">
+    <div class="path-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v4M8 16h.01M16 16h.01"/>
+      </svg>
+    </div>
+    <div class="path-badge">Rekommenderas</div>
+    <h3>MCP — för AI-agenter</h3>
+    <p>Låt Claude Code, Kilo Code eller Cline söka åt dig.</p>
+  </a>
+
+  <a href="#rest" class="path-card">
+    <div class="path-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 18 22 12 16 6"/>
+        <polyline points="8 6 2 12 8 18"/>
+      </svg>
+    </div>
+    <h3>REST API — för system</h3>
+    <p>Bygg eget system eller script.</p>
+  </a>
+
+  <a href="/browse" class="path-card">
+    <div class="path-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </div>
+    <h3>Webbläsare</h3>
+    <p>Sök direkt här på webben.</p>
+  </a>
+</div>
+
+<!-- MCP SECTION -->
+<section class="agent-section" id="mcp">
+  <div class="agent-section-header">
+    <div class="agent-section-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <circle cx="12" cy="5" r="2"/>
+        <path d="M12 7v4M8 16h.01M16 16h.01"/>
+      </svg>
+    </div>
+    <div>
+      <h2>MCP — för AI-agenter</h2>
+      <p class="muted" style="margin: 0.25rem 0 0 0;">Låt din AI-assistent söka och läsa upphandlingar åt dig — utan att du öppnar webbläsaren.</p>
+    </div>
+  </div>
+
+  <div class="agent-setup">
+    <h3>Så här kopplar du in</h3>
+    <p>Lägg till detta i din AI-klients konfiguration:</p>
+
+    <div class="code-tabs">
+      <button class="code-tab active" data-tab="claude">Claude Code</button>
+      <button class="code-tab" data-tab="kilo">Kilo Code</button>
+      <button class="code-tab" data-tab="cline">Cline</button>
+      <button class="code-tab" data-tab="docker">Docker</button>
+    </div>
+
+    <div class="code-panel">
+      <div class="code-content" id="tab-claude">
+        <pre><code>{
+  "mcpServers": {
+    "opentender": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/opentender",
+      "env": {
+        "DB_PATH": "/data/opentender.db"
+      }
+    }
+  }
+}</code></pre>
+      </div>
+      <div class="code-content hidden" id="tab-kilo">
+        <pre><code>// Kilo Code → Inställningar → MCP Servers → Add
+Type: stdio
+Command: python -m mcp_server
+Working directory: /path/to/opentender
+Environment: DB_PATH=/data/opentender.db</code></pre>
+      </div>
+      <div class="code-content hidden" id="tab-cline">
+        <pre><code>// Cline → Settings → MCP Servers
+{
+  "opentender": {
+    "command": "python",
+    "args": ["-m", "mcp_server"],
+    "cwd": "/path/to/opentender"
+  }
+}</code></pre>
+      </div>
+      <div class="code-content hidden" id="tab-docker">
+        <pre><code>{
+  "mcpServers": {
+    "opentender": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/path/to/data:/data",
+        "ghcr.io/magnusfroste/opentender:latest",
+        "python", "-m", "mcp_server"
+      ]
+    }
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="agent-tools">
+    <h3>Verktyg din agent får</h3>
+    <div class="tools-grid">
+      <div class="tool-card">
+        <div class="tool-name">search_tenders</div>
+        <p>Sök upphandlingar med nyckelord, kategori eller region.</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">get_tender</div>
+        <p>Full info om en upphandling, inklusive om konto krävs.</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">match_profile</div>
+        <p>Hitta upphandlingar som matchar din profil — nyckelord, kategori, region.</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">get_stats</div>
+        <p>Översikt: hur många upphandlingar finns och från vilka källor.</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">list_providers</div>
+        <p>Vilka källor har ni och vilka kräver konto för att ansöka?</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">list_regions</div>
+        <p>Vilka län finns med i databasen?</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">list_cpv_top</div>
+        <p>Vanligaste kategorierna. Ex: "72" för IT, "45" för bygg.</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">get_authority</div>
+        <p>Alla upphandlingar från en organisation, t.ex. Trafikverket.</p>
+      </div>
+      <div class="tool-card">
+        <div class="tool-name">sync_now</div>
+        <p>Hämta ny data nu. Vänta en minut och kolla sedan statistiken.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top: 1.5rem;">
+    Full dokumentation: <a href="https://github.com/magnusfroste/opentender/blob/main/MCP.md" target="_blank" rel="noopener">MCP.md på GitHub ↗</a>
+  </p>
+</section>
+
+<!-- REST SECTION -->
+<section class="agent-section secondary" id="rest">
+  <div class="agent-section-header">
+    <div class="agent-section-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 18 22 12 16 6"/>
+        <polyline points="8 6 2 12 8 18"/>
+      </svg>
+    </div>
+    <div>
+      <h2>REST API — för system</h2>
+      <p class="muted" style="margin: 0.25rem 0 0 0;">För den som vill bygga eget system eller script.</p>
+    </div>
+  </div>
+
+  <h3>Endpoints</h3>
+  <div class="api-table">
+    <div class="api-row">
+      <span class="api-method get">GET</span>
+      <code>/api/health</code>
+      <span class="muted">Status, antal upphandlingar, cron-schema</span>
+    </div>
+    <div class="api-row">
+      <span class="api-method get">GET</span>
+      <code>/api/stats</code>
+      <span class="muted">Statistik per källa, top upphandlare, senaste syncs</span>
+    </div>
+    <div class="api-row">
+      <span class="api-method get">GET</span>
+      <code>/api/tenders?q=&source=&authority=&cpv=&page=</code>
+      <span class="muted">Sök upphandlingar, paginerat</span>
+    </div>
+    <div class="api-row">
+      <span class="api-method get">GET</span>
+      <code>/api/tenders/{id}</code>
+      <span class="muted">En specifik upphandling</span>
+    </div>
+    <div class="api-row">
+      <span class="api-method post">POST</span>
+      <code>/api/sync</code>
+      <span class="muted">Trigga daglig sync (202, körs i bakgrunden)</span>
+    </div>
+    <div class="api-row">
+      <span class="api-method post">POST</span>
+      <code>/api/backfill?days=90</code>
+      <span class="muted">Hämta mer historik från TED EU</span>
+    </div>
+  </div>
+
+  <h3>Exempel</h3>
+  <pre><code>curl "https://opentender.liteit.se/api/tenders?q=it-konsult&source=mercell"</code></pre>
+  <pre><code>curl "https://opentender.liteit.se/api/tenders/42"</code></pre>
+
+  <p class="muted" style="margin-top: 1rem;">
+    Full OpenAPI-spec: <a href="/openapi.json">/openapi.json</a>
+  </p>
+</section>
+
+<script>
+  document.querySelectorAll('.code-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.code-content').forEach(c => c.classList.add('hidden'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+    });
+  });
+</script>
+{% endblock %}

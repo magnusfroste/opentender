@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Providers{% endblock %}
+
+{% block content %}
+<h1>Providers</h1>
+<p class="sub">Vi är transparenta: det här är datakällorna vi crawlar, hur vi når dem, och deras nuvarande status.</p>
+
+<div class="card">
+  <p>Alla svenska upphandlingar måste enligt lag publiceras enligt offentlighetsprincipen, men plattformarna som samlar in dem äger sina egna API:er och sina egna villkor. Vi speglar bara det som är publikt tillgängligt och länkar alltid tillbaka till originalannonsen via <code>tender_url</code> — vi är aldrig den slutgiltiga källan.</p>
+</div>
+
+<h2>Aktiva providers</h2>
+
+{% for p in providers %}
+<div class="card">
+  <div class="flex items-center between" style="flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+      <strong style="font-size: 1.05rem;">{{ p.name }}</strong>
+      <span class="badge badge-source" style="margin-left: 0.5rem;">{{ p.id }}</span>
+      {% if p.status == 'live' %}
+        <span class="badge badge-ok" style="margin-left: 0.5rem;">Live</span>
+      {% elif p.status == 'partial' %}
+        <span class="badge badge-err" style="margin-left: 0.5rem;">Delvis live</span>
+      {% else %}
+        <span class="badge badge-err" style="margin-left: 0.5rem;">Inte implementerad</span>
+      {% endif %}
+    </div>
+    <div class="muted" style="font-size: 0.9rem;">
+      {{ "{:,}".format(p.count).replace(",", " ") if p.count else 0 }} upphandlingar i DB
+    </div>
+  </div>
+
+  <dl style="margin-top: 0.75rem;">
+    <dt>Beskrivning</dt>
+    <dd>{{ p.description }}</dd>
+    <dt>Metod</dt>
+    <dd><code>{{ p.method }}</code> {{ p.method_note }}</dd>
+    <dt>URL-mönster</dt>
+    <dd><code>{{ p.url_pattern }}</code></dd>
+    {% if p.requires_auth %}
+    <dt>Auth</dt>
+    <dd>{{ p.requires_auth }}</dd>
+    {% endif %}
+    {% if p.notes %}
+    <dt>Noteringar</dt>
+    <dd>{{ p.notes }}</dd>
+    {% endif %}
+  </dl>
+
+  <details style="margin-top: 0.75rem;">
+    <summary class="muted">Tekniska detaljer</summary>
+    <pre><code>{{ p.technical }}</code></pre>
+  </details>
+</div>
+{% endfor %}
+
+<h2>Planerade providers</h2>
+
+<p class="muted">Kända plattformar vi vill spegla men som kräver mer jobb (vanligtvis: inloggning, headless browser, eller mer komplex HTML-scraping).</p>
+
+<div class="card">
+  <strong>Tendsign (Visma MeForm)</strong> <span class="muted">— ~36% av offentlig.ai:s volym</span>
+  <p>Plattform för svenska upphandlingar från kommuner och myndigheter. Inget publikt API. Scraping kräver Selenium + headless browser. Referens: <a href="https://github.com/yuril93/tendsign.com-scraping" target="_blank" rel="noopener">yuril93/tendsign.com-scraping</a> (Selenium, 2019 — kan behöva uppdateras).</p>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--ok);">
+  <strong>e-Avrop</strong> <span class="muted">— respekterad, INTE speglad</span>
+  <p>Vi respekterar e-Avrops <code>robots.txt</code> (<code>Disallow: /</code>). De har gjort ett aktivt val att blockera crawling. Det är deras rätt — plattformen äger sin data, även om underliggande upphandlingar är offentliga handlingar.</p>
+  <p>Om du vill ha e-Avrop-data: gå direkt till <a href="https://www.e-avrop.com/e-Upphandling/" target="_blank" rel="noopener">e-Avrop</a> eller använd Mercell som speglar den mesta av e-Avrops data ändå.</p>
+  <p class="muted"><em>Det här är ett medvetet val: vi tror att öppna data byggs bäst genom samarbete, inte konfrontation.</em></p>
+</div>
+
+<div class="card">
+  <strong>Clira (Esource)</strong> <span class="muted">— ~5% av volymen</span>
+  <p>AI-driven upphandlingsplattform. Backend (<code>api.clira.io</code>) är Sanctum-skyddat och kräver inloggning. Offentlig annonsvisning finns på <code>public.clira.io</code> men data är client-side-renderad. Möjlig lösning: konto + scraping, eller headless browser.</p>
+</div>
+
+<div class="card">
+  <strong>e-Avrop</strong> <span class="muted">— ~23% av volymen (delvis via Mercell)</span>
+  <p>Stor svensk plattform. Mercell speglar den mesta datan men inte allt. Vanlig HTTP-scraping mot <code>www.e-avrop.com/e-Upphandling/</code> är möjligt. Referens: <code>Magto/upphandling-matcher</code> (server/scraper/eavrop.py).</p>
+</div>
+
+<div class="card">
+  <strong>Kommersannons (Elite / upphandling.se)</strong> <span class="muted">— ~12% av volymen (delvis via Mercell)</span>
+  <p>Samlar flera kommuners upphandlingar. Inget publikt API. Innehåll är delvis JS-renderat. Möjlig men inte trivial scraping.</p>
+</div>
+
+<div class="card">
+  <strong>Trafikverket, Polisen, kommunsajter</strong> <span class="muted">— ~10% av volymen, spritt över ~100 sajter</span>
+  <p>Myndigheter och kommuner kör ofta sina egna upphandlingssystem. Vissa är i Mercell, andra inte. Hög arbetsinsats, låg marginal per sajt.</p>
+</div>
+
+
+
+<h2>Ekosystem — andra verktyg som hjälper svenska företag</h2>
+
+<p>OpenTender är en spegel. Det finns andra verktyg som gör kompletterande saker. Hela kedjan behövs för att småföretag ska kunna navigera offentlig upphandling utan att anlita konsulter.</p>
+
+<div class="cards">
+  <div class="card">
+    <strong>🏛️ Upphandlingsmyndigheten</strong> <span class="muted">myndighet, fri tillgång</span>
+    <p>Sveriges myndighet för upphandlingsstöd. Lagar, vägledning, hållbarhetskriterier, verktyg för annonsering. Den formella källan.</p>
+    <p>🔗 <a href="https://www.upphandlingsmyndigheten.se" target="_blank" rel="noopener">upphandlingsmyndigheten.se</a></p>
+  </div>
+
+  <div class="card">
+    <strong>💡 PublicInsight</strong> <span class="muted">SaaS, gratis tier</span>
+    <p>Fokus på <em>insikt</em>: vem upphandlar vad, hur stor är din marknad, hur matchar du rätt anbud. Plus kunskapsbank, mallar och personlig coachning. Bästa platsen att börja om du är ett småföretag som vill offerera.</p>
+    <p>🔗 <a href="https://www.publicinsight.se" target="_blank" rel="noopener">publicinsight.se</a></p>
+  </div>
+
+  <div class="card">
+    <strong>🇪🇺 TED EU</strong> <span class="muted">EU-myndighet, fri tillgång</span>
+    <p>Alla EU-tröskelvärden. Den ursprungliga datakällan vi speglar för svenska notiser. Rättsligt bindande publiceringskanal.</p>
+    <p>🔗 <a href="https://ted.europa.eu" target="_blank" rel="noopener">ted.europa.eu</a></p>
+  </div>
+
+  <div class="card">
+    <strong>🤖 isakskogstad/Upphandlingsdata-MCP</strong> <span class="muted">open source, MCP</span>
+    <p>MCP-server som ger Claude Code / Kilo Code direktåtkomst till svensk upphandlingsdata från Upphandlingsmyndigheten + TED. Vår syskon.</p>
+    <p>🔗 <a href="https://github.com/isakskogstad/Upphandlingsdata-MCP" target="_blank" rel="noopener">github.com/isakskogstad/...</a></p>
+  </div>
+
+  <div class="card">
+    <strong>📋 Magto/upphandling-matcher</strong> <span class="muted">open source, Hetzner</span>
+    <p>Samma problem som vi löser: Mercell + e-Avrop scraper, Hetzner-deploy, FastAPI. Referens-implementation vi lärde oss från.</p>
+    <p>🔗 <a href="https://github.com/Magnusfroste/upphandling-matcher" target="_blank" rel="noopener">github.com/Magnusfroste/...</a></p>
+  </div>
+
+  <div class="card">
+    <strong>🏢 Plattformarna (Mercell, Tendsign, e-Avrop, Clira)</strong> <span class="muted">affärsmodeller</span>
+    <p>De som faktiskt driver marknaden. Mercell, Tendsign (Visma), e-Avrop, Clira, Kommersannons. Vi speglar där de tillåter, vi rekommenderar att gå direkt till dem för anbud.</p>
+  </div>
+</div>
+
+<h2>Vår roll: inte konkurrent — komplement</h2>
+
+<p>Vi gör inte ansökningarna enklare. Det gör PublicInsight. Vi gör inte reglerna tydligare. Det gör Upphandlingsmyndigheten. Vi är bara <strong>en öppen spegel</strong> som gör det enklare att upptäcka vad som faktiskt publiceras.</p>
+
+<p>Om du är en utvecklare som vill bygga något bättre: <strong>fork this repo</strong>. Vår kod är MIT-licensierad. Våra scrapers är skrivna för att vara lätta att porta, modifiera och förbättra. Använd det vi byggt, eller bygg om det från grunden — vi hejar på båda.</p>
+
+<p>Om du representerar en plattform (Mercell, Tendsign, e-Avrop, Clira) och vill diskutera öppna API:er, datadelning eller samarbete: <a href="https://github.com/magnusfroste/opentender">öppna en issue</a> eller kontakta oss.</p>
+
+<h2>Bidra</h2>
+<p>Saknar du en provider? Öppna en issue eller PR på <a href="https://github.com/magnusfroste/opentender" target="_blank" rel="noopener">GitHub</a>. Varje ny källa är ungefär 150–300 rader Python + registrering i <code>scraper/orchestrator.py</code>.</p>
+{% endblock %}

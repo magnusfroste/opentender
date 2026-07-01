@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}OpenTender{% endblock %} — Svenska upphandlingar</title>
+
+  <!-- SEO -->
+  <meta name="description" content="OpenTender — fri tillgång till svenska offentliga upphandlingar. Sök, bevaka och utforska upphandlingar från Mercell, TED EU och fler källor. Öppet API, MCP för AI-agenter. Infrastruktur för demokrati." />
+  <meta name="keywords" content="upphandling, offentlig upphandling, Sverige, anbud, offentlig, Mercell, TED, LOU, direktupphandling, ramavtal, CPV, upphandlingsmyndigheten, fri data, öppen data" />
+  <meta name="author" content="OpenTender" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://opentender.liteit.se/" />
+
+  <!-- OpenGraph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="OpenTender — Svenska upphandlingar, öppna för alla" />
+  <meta property="og:description" content="Fri tillgång till svenska offentliga upphandlingar. Sök, bevaka och bygg ovanpå med öppet API och MCP. Infrastruktur för demokrati." />
+  <meta property="og:url" content="https://opentender.liteit.se/" />
+  <meta property="og:site_name" content="OpenTender" />
+  <meta property="og:locale" content="sv_SE" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="OpenTender — Svenska upphandlingar, öppna för alla" />
+  <meta name="twitter:description" content="Fri tillgång till svenska offentliga upphandlingar. Öppet API + MCP för AI-agenter." />
+
+  <!-- AEO (Answer Engine Optimization) — för AI-crawlers -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "OpenTender",
+    "description": "Fri tillgång till svenska offentliga upphandlingar. Sök, bevaka och bygg ovanpå med öppet API och MCP.",
+    "url": "https://opentender.liteit.se/",
+    "applicationCategory": "GovernmentApplication",
+    "operatingSystem": "Web",
+    "offers": {"@type": "Offer", "price": "0", "priceCurrency": "SEK"},
+    "license": "https://opensource.org/licenses/MIT",
+    "keywords": ["upphandling", "offentlig upphandling", "Sverige", "anbud", "Mercell", "TED EU", "CPV", "LOU"],
+    "inLanguage": "sv"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Vad är OpenTender?",
+        "acceptedAnswer": {"@type": "Answer", "text": "OpenTender är en öppen spegel av svenska offentliga upphandlingar. Vi samlar data från Mercell, TED EU och andra källor i en SQLite-databas och serverar den via webb, REST API och MCP för AI-agenter."}
+      },
+      {
+        "@type": "Question",
+        "name": "Är OpenTender gratis?",
+        "acceptedAnswer": {"@type": "Answer", "text": "Ja. Hela API:t är öppet — inga konton, inga API-nycklar, inga betalväggar. Att söka är alltid gratis. För vissa upphandlingar behöver du skapa konto hos plattformen (Mercell, Tendsign, etc.) för att komma åt anbudsformulär och dokument."}
+      },
+      {
+        "@type": "Question",
+        "name": "Vilka datakällor använder OpenTender?",
+        "acceptedAnswer": {"@type": "Answer", "text": "Mercell (publikt sök-API, ~65-70% av svensk volym) och TED EU (EU-tröskelvärden). Vi respekterar robots.txt — e-Avrop är inte speglad eftersom de blockerar crawling."}
+      },
+      {
+        "@type": "Question",
+        "name": "Kan AI-agenter använda OpenTender?",
+        "acceptedAnswer": {"@type": "Answer", "text": "Ja. OpenTender har en MCP-server med 9 verktyg (search_tenders, get_tender, get_stats, list_providers, list_regions, sync_now, list_cpv_top, get_authority, match_profile) som låter Claude Code, Kilo Code och Cline söka och läsa upphandlingar direkt."}
+      },
+      {
+        "@type": "Question",
+        "name": "Hur ofta uppdateras datan?",
+        "acceptedAnswer": {"@type": "Answer", "text": "Cron körs dagligen kl 06:00 UTC som default. Du kan också trigga en synk manuellt via dashboarden eller POST /api/sync."}
+      }
+    ]
+  }
+  </script>
+
+  <!-- Favicon (inline SVG, Swedish flag) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Crect width='16' height='12' fill='%23006aa7'/%3E%3Crect y='4' width='16' height='4' fill='%23fecc00'/%3E%3Crect x='5' width='4' height='12' fill='%23fecc00'/%3E%3C/svg%3E" />
+
+  <link rel="stylesheet" href="/static/style.css" />
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Hoppa till innehåll</a>
+  <header class="site">
+    <div class="inner">
+      <a href="/" class="brand">
+        <span class="dot"></span>
+        <span>OpenTender</span>
+     </a>
+      <nav>
+        <a href="/" class="{% set p=request.url.path if request else '' %}{% if p == '/' %}active{% endif %}">Hem</a>
+        <a href="/browse" class="{% set p=request.url.path if request else '' %}{% if p.startswith('/browse') or p.startswith('/tenders') %}active{% endif %}">Browse</a>
+        <a href="/dashboard" class="{% set p=request.url.path if request else '' %}{% if p.startswith('/dashboard') %}active{% endif %}">Insikter</a>
+        <a href="/system" class="{% set p=request.url.path if request else '' %}{% if p.startswith('/system') %}active{% endif %}">System</a>
+        <a href="/providers" class="{% set p=request.url.path if request else '' %}{% if p.startswith('/providers') %}active{% endif %}">Providers</a>
+        <a href="/agenter" class="{% set p=request.url.path if request else '' %}{% if p.startswith('/agenter') %}active{% endif %}">Agenter</a>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Växla mörkt/ljust läge" title="Mörkt/ljust läge">◐</button>
+     </nav>
+   </div>
+ </header>
+  <main id="main">
+    {% block content %}{% endblock %}
+ </main>
+</body>
+</html>

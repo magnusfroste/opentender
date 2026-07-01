@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}System — driftstatus{% endblock %}
+
+{% block content %}
+<h1>System</h1>
+<p class="sub">Driftstatus, sync-historik och cron-schema.</p>
+
+<!-- HEALTH -->
+<section class="insight-section">
+  <h2>Status</h2>
+  <div class="insight-kpis">
+    <div class="insight-kpi {% if health.tenders_total > 0 %}green{% endif %}">
+      <div class="v">{{ "{:,}".format(health.tenders_total).replace(",", " ") }}</div>
+      <div class="l">Upphandlingar i databasen</div>
+    </div>
+    <div class="insight-kpi">
+      <div class="v">{{ health.cron_schedule }}</div>
+      <div class="l">Cron-schema</div>
+    </div>
+    <div class="insight-kpi">
+      <div class="v">{{ health.next_run }}</div>
+      <div class="l">Nästa synk</div>
+    </div>
+  </div>
+  
+  <div class="sync-actions">
+    <button id="sync-btn" class="btn primary">Kör sync nu</button>
+    <button id="backfill-btn" class="btn ghost">Backfill TED (90 dagar)</button>
+  </div>
+  <div id="sync-result" class="sync-result"></div>
+</section>
+
+<!-- SYNC LOG -->
+<section class="insight-section">
+  <h2>Sync-historik</h2>
+  <table class="sync-table">
+    <thead>
+      <tr><th>Källa</th><th>Tid</th><th>Antal</th><th>Status</th><th>Meddelande</th></tr>
+    </thead>
+    <tbody>
+      {% for s in syncs %}
+      <tr class="sync-{{ s.status }}">
+        <td>{{ s.source }}</td>
+        <td>{{ s.run_at[:19] }}</td>
+        <td>{{ s.count }}</td>
+        <td>{{ s.status }}</td>
+        <td class="muted">{{ s.message or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<!-- DATA SOURCES -->
+<section class="insight-section">
+  <h2>Datakällor</h2>
+  <table class="sync-table">
+    <thead>
+      <tr><th>Källa</th><th>Antal i DB</th><th>Senaste sync</th></tr>
+    </thead>
+    <tbody>
+      {% for s in sources %}
+      <tr>
+        <td>{{ s.source_system }}</td>
+        <td>{{ s.count }}</td>
+        <td class="muted">{{ s.last_sync or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<script>
+  async function triggerSync(url, label) {
+    const result = document.getElementById('sync-result');
+    result.innerHTML = `<span class="spinner"></span> ${label} startar...`;
+    try {
+      const r = await fetch(url, { method: 'POST' });
+      const data = await r.json();
+      if (r.status === 202) {
+        result.innerHTML = `✅ ${label} startad. Laddar om om 60s.`;
+        setTimeout(() => location.reload(), 60000);
+      } else {
+        result.innerHTML = `❌ ${data.error || 'Okänt fel'}`;
+      }
+    } catch (e) {
+      result.innerHTML = `❌ ${e}`;
+    }
+  }
+
+  document.getElementById('sync-btn')?.addEventListener('click', () => triggerSync('/api/sync', 'Sync'));
+  document.getElementById('backfill-btn')?.addEventListener('click', () => triggerSync('/api/backfill?days=90', 'Backfill'));
+</script>
+{% endblock %}

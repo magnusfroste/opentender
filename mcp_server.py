@@ -1,0 +1,678 @@
+"""
+MCP-server för OpenTender — stdio-transport.
+
+Wraps OpenTender's REST API as MCP tools so Claude Code / Kilo Code / Cline /
+any MCP-kompatibel klient kan söka och läsa svenska upphandlingar.
+
+Följer best practices för LLM-tool-design:
+- Korta descriptions (1 mening + exempel)
+- Tydliga enums (inga hallucinerade parametrar)
+- Säkra defaults (open_only=true)
+- Markdown-formaterad output (LLM-vänlig)
+- Paywall/auth info per källa (agenten vet om konto krävs)
+
+Användning:
+  python -m mcp_server
+
+Claude Desktop config:
+  {"mcpServers": {"opentender": {"command": "python", "args": ["-m", "mcp_server"]}}}
+"""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+import mcp.server.stdio
+import mcp.types as types
+from mcp.server import Server
+
+# Reuse OpenTender's DB layer
+sys.path.insert(0, str(Path(__file__).parent))
+from app.db import connect  # noqa: E402
+
+DB_PATH = os.environ.get("DB_PATH", "/data/opentender.db")
+
+server = Server("opentender")
+
+
+# ----- Provider metadata (paywall/auth info) -------------------------------
+
+PROVIDERS = {
+    "mercell": {
+        "name": "Mercell",
+        "url": "https://search-service-api.discover.app.mercell.com/",
+        "auth": "open",  # data is open, but to APPLY you need an account
+        "data_status": "live",
+    },
+    "ted": {
+        "name": "TED EU",
+        "url": "https://ted.europa.eu/",
+        "auth": "open",  # fully public, no account needed
+        "data_status": "live",
+    },
+    "tendsign": {
+        "name": "Tendsign (Visma)",
+        "url": "https://tendsign.com/",
+        "auth": "required",  # to apply
+        "data_status": "not_implemented",
+    },
+    "eavrop": {
+        "name": "e-Avrop",
+        "url": "https://www.e-avrop.com/",
+        "auth": "required",
+        "data_status": "not_implemented",
+    },
+    "kommersannons": {
+        "name": "Kommersannons",
+        "url": "https://www.kommersannons.se/",
+        "auth": "required",
+        "data_status": "not_implemented",
+    },
+    "clira": {
+        "name": "Clira (Esource)",
+        "url": "https://esource.clira.io/",
+        "auth": "required",  # plus it's a paid SaaS
+        "data_status": "not_implemented",
+    },
+}
+
+
+# ----- Helpers ---------------------------------------------------------------
+
+def _row_dict(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    for k in ("cpv_codes", "raw_json"):
+        if d.get(k) and isinstance(d[k], str):
+            try:
+                d[k] = json.loads(d[k])
+            except Exception:
+                pass
+    return d
+
+
+def _days_until(date_str: Optional[str]) -> Optional[int]:
+    if not date_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(date_str[:19])
+        return (dt - datetime.now()).days
+    except Exception:
+        return None
+
+
+def _format_tender(t: dict) -> str:
+    """Format a tender as readable markdown for the LLM."""
+    src = t.get("source_system", "")
+    provider = PROVIDERS.get(src, {})
+    p_auth = provider.get("auth", "?")
+
+    lines = [f"**{t.get('title') or '(utan titel)'}**"]
+    lines.append(f"Upphandlare: {t.get('authority') or '—'} | Plats: {t.get('region') or '—'}")
+    lines.append(f"Källa: {provider.get('name', src)} | Publicerad: {(t.get('published_at') or '—')[:10]}")
+
+    if t.get("deadline"):
+        days = _days_until(t.get("deadline"))
+        if days is not None:
+            if days < 0:
+                lines.append(f"Deadline: {t['deadline'][:10]} — STÄNGD ({abs(days)} dagar sedan)")
+            elif days <= 3:
+                lines.append(f"Deadline: {t['deadline'][:10]} — ⚠️ BRÅDSKANDE ({days} dagar kvar)")
+            elif days <= 14:
+                lines.append(f"Deadline: {t['deadline'][:10]} — {days} dagar kvar (snart)")
+            else:
+                lines.append(f"Deadline: {t['deadline'][:10]} — {days} dagar kvar")
+
+    if t.get("value"):
+        lines.append(f"Värde: {t['value']:,.0f} SEK")
+    if t.get("procedure"):
+        lines.append(f"Procedur: {t['procedure']}")
+    if t.get("contract_type"):
+        lines.append(f"Avtalstyp: {t['contract_type']}")
+    if t.get("cpv_codes"):
+        cpv = t["cpv_codes"] if isinstance(t["cpv_codes"], list) else []
+        if cpv:
+            lines.append(f"CPV: {', '.join(str(c) for c in cpv[:5])}")
+
+    lines.append("")
+    lines.append(f"🔗 Länk: {t.get('tender_url') or t.get('source_url') or '—'}")
+    if p_auth == "required":
+        lines.append("⚠️  Att ansöka kräver konto hos upphandlarens plattform.")
+    else:
+        lines.append("✅ TED EU = helt publikt, inget konto krävs.")
+
+    if t.get("description"):
+        desc = t["description"][:400]
+        lines.append(f"\n{desc}{'...' if len(t.get('description','')) > 400 else ''}")
+    return "\n".join(lines)
+
+
+# ----- Tool definitions ------------------------------------------------------
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="search_tenders",
+            description=(
+                "Search Swedish public procurement tenders. "
+                "Examples: query='IT-konsult stockholm', cpv='72' (IT), cpv='45' (construction), "
+                "source='ted' (EU-thresholds only), open_only=false (include closed). "
+                "Returns title, buyer, deadline with days-until, value, CPV, and a deep link."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search keyword. Swedish works best. Examples: 'IT-konsult', 'vägbyggnation', 'solcell', 'städning'."
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": ["mercell", "ted"],
+                        "description": "Data source to filter by. 'mercell' = most Swedish tenders. 'ted' = EU-threshold only."
+                    },
+                    "authority": {
+                        "type": "string",
+                        "description": "Filter by buyer/contracting authority (substring match). Examples: 'Trafikverket', 'Stockholms kommun', 'KTH'."
+                    },
+                    "cpv": {
+                        "type": "string",
+                        "description": "CPV code prefix to filter by. Examples: '72' (IT), '45' (construction), '34' (transport), '33' (medical), '09' (energy)."
+                    },
+                    "open_only": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "If true (default), exclude tenders past their deadline."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Max results (default 10, max 50)."
+                    }
+                }
+            },
+        ),
+        types.Tool(
+            name="get_tender",
+            description=(
+                "Get full details for one tender by its internal id (from search_tenders). "
+                "Includes complete description and notes whether applying requires an account."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "Internal tender id."}
+                },
+                "required": ["id"]
+            },
+        ),
+        types.Tool(
+            name="get_stats",
+            description=(
+                "Database overview: total tenders, open count, per-source counts, last sync. "
+                "Use this first to understand what's available before searching."
+            ),
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        types.Tool(
+            name="list_providers",
+            description=(
+                "List data sources (Mercell, TED EU, etc.) with status and whether they require "
+                "an account to APPLY. Note: data is always free; the account is only for submission."
+            ),
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        types.Tool(
+            name="list_regions",
+            description=(
+                "List Swedish regions (län) with tender counts. Use before search_tenders to "
+                "discover geographic coverage."
+            ),
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        types.Tool(
+            name="sync_now",
+            description=(
+                "Trigger immediate scrape of all enabled sources. Returns when sync starts; "
+                "check get_stats after 60-90s to see updated counts."
+            ),
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        types.Tool(
+            name="list_cpv_top",
+            description=(
+                "Top CPV (Common Procurement Vocabulary) codes in the database with counts. "
+                "Use this to discover what categories have tenders before searching. "
+                "Examples: prefix='72' for IT-only top categories, top=5 for top 5 overall."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "prefix": {
+                        "type": "string",
+                        "description": "Optional CPV prefix to filter (e.g. '72' for IT, '45' for construction)."
+                    },
+                    "top": {
+                        "type": "integer",
+                        "default": 15,
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "How many top categories to return (default 15)."
+                    }
+                }
+            },
+        ),
+        types.Tool(
+            name="get_authority",
+            description=(
+                "All tenders from one specific buyer/contracting authority. "
+                "Use search_tenders first to find a buyer name, then get_authority for their full list. "
+                "Examples: name='Trafikverket', name='Stockholms kommun'."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Buyer/authority name (substring match). Examples: 'Trafikverket', 'KTH', 'Mälarenergi'."
+                    },
+                    "open_only": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, exclude past-deadline tenders."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "Max results (default 20, max 100)."
+                    }
+                },
+                "required": ["name"]
+            },
+        ),
+        types.Tool(
+            name="match_profile",
+            description=(
+                "Find tenders matching a profile (keywords + CPV prefixes + regions). "
+                "Use this for monitoring/saved searches. "
+                "Examples: keywords=['IT', 'digitalisering'], cpv_prefixes=['72'], regions=['Stockholms län']."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Keywords to match against title+description. Any-match (OR)."
+                    },
+                    "cpv_prefixes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "CPV prefixes to match. Examples: ['72', '722']."
+                    },
+                    "regions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Region names to match. Examples: ['Stockholms län', 'Västra Götalands län']."
+                    },
+                    "open_only": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "If true (default), only open tenders."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Max results."
+                    }
+                }
+            },
+        ),
+    ]
+
+
+# ----- Tool implementations -------------------------------------------------
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[types.Content]:
+    conn = connect(DB_PATH)
+    try:
+        if name == "search_tenders":
+            return await _search_tenders(conn, arguments)
+        elif name == "get_tender":
+            return await _get_tender(conn, arguments)
+        elif name == "get_stats":
+            return await _get_stats(conn, arguments)
+        elif name == "list_providers":
+            return await _list_providers(conn, arguments)
+        elif name == "list_regions":
+            return await _list_regions(conn, arguments)
+        elif name == "sync_now":
+            return await _sync_now(arguments)
+        elif name == "list_cpv_top":
+            return await _list_cpv_top(conn, arguments)
+        elif name == "get_authority":
+            return await _get_authority(conn, arguments)
+        elif name == "match_profile":
+            return await _match_profile(conn, arguments)
+        else:
+            return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
+    finally:
+        conn.close()
+
+
+async def _search_tenders(conn, args: dict) -> list[types.Content]:
+    where = []
+    params: list = []
+
+    if args.get("query"):
+        where.append("(title LIKE ? OR description LIKE ?)")
+        params.extend([f"%{args['query']}%", f"%{args['query']}%"])
+    if args.get("source"):
+        where.append("source_system = ?")
+        params.append(args["source"])
+    if args.get("authority"):
+        where.append("authority LIKE ?")
+        params.append(f"%{args['authority']}%")
+    if args.get("cpv"):
+        where.append("cpv_codes LIKE ?")
+        params.append(f'%"{args["cpv"]}')
+
+    if args.get("open_only", True):
+        where.append("(deadline IS NULL OR deadline > ?)")
+        params.append(datetime.now().isoformat(timespec="seconds"))
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    limit = min(args.get("limit", 10), 50)
+
+    rows = conn.execute(
+        f"""
+        SELECT id, source_system, source_id, tender_url, title, authority,
+               cpv_codes, deadline, published_at, value, procedure, region
+        FROM tenders {where_sql}
+        ORDER BY
+            CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+            deadline ASC NULLS LAST,
+            published_at DESC
+        LIMIT ?
+        """,
+        params + [limit],
+    ).fetchall()
+    items = [_row_dict(r) for r in rows]
+
+    if not items:
+        return [types.TextContent(
+            type="text",
+            text=f"Inga upphandlingar matchar {args}. Prova bredare sökning, annan CPV, eller open_only=false."
+        )]
+
+    header = f"Hittade {len(items)} upphandlingar"
+    body = "\n\n---\n\n".join(_format_tender(t) for t in items)
+    return [types.TextContent(type="text", text=f"{header}\n\n{body}")]
+
+
+async def _get_tender(conn, args: dict) -> list[types.Content]:
+    tid = args.get("id")
+    if not isinstance(tid, int):
+        return [types.TextContent(type="text", text="Missing or invalid 'id' (must be integer).")]
+    row = conn.execute("SELECT * FROM tenders WHERE id = ?", (tid,)).fetchone()
+    if not row:
+        return [types.TextContent(type="text", text=f"Tender {tid} not found.")]
+    t = _row_dict(row)
+    body = _format_tender(t)
+    if t.get("description"):
+        body += f"\n\n=== FULL DESCRIPTION ===\n{t['description']}"
+    return [types.TextContent(type="text", text=body)]
+
+
+async def _get_stats(conn, args: dict) -> list[types.Content]:
+    total = conn.execute("SELECT COUNT(*) FROM tenders").fetchone()[0]
+    open_n = conn.execute(
+        "SELECT COUNT(*) FROM tenders WHERE deadline IS NULL OR deadline > ?",
+        (datetime.now().isoformat(timespec="seconds"),),
+    ).fetchone()[0]
+    by_source = conn.execute(
+        "SELECT source_system, COUNT(*) FROM tenders GROUP BY source_system ORDER BY 2 DESC"
+    ).fetchall()
+    last = conn.execute(
+        "SELECT source, run_at, count, status FROM sync_log ORDER BY run_at DESC LIMIT 1"
+    ).fetchone()
+
+    lines = [
+        f"**Totalt:** {total} upphandlingar ({open_n} öppna just nu).",
+        "",
+        "**Per datakälla:**",
+    ]
+    for s, n in by_source:
+        prov = PROVIDERS.get(s, {})
+        auth = prov.get("auth", "?")
+        auth_str = "öppet" if auth == "open" else "konto krävs"
+        lines.append(f"- {prov.get('name', s)} [{s}]: {n} upphandlingar. Att ansöka: {auth_str}.")
+    if last:
+        ls = dict(last)
+        lines.append("")
+        lines.append(
+            f"**Senaste sync:** {ls.get('source')} kl {ls.get('run_at','?')[:19]} — "
+            f"{ls.get('count')} records, status={ls.get('status')}"
+        )
+    return [types.TextContent(type="text", text="\n".join(lines))]
+
+
+async def _list_providers(conn, args: dict) -> list[types.Content]:
+    counts = dict(conn.execute(
+        "SELECT source_system, COUNT(*) FROM tenders GROUP BY source_system"
+    ).fetchall())
+    lines = ["**Aktiva providers (live i OpenTender):**", ""]
+    for pid, meta in PROVIDERS.items():
+        if meta["data_status"] != "live":
+            continue
+        n = counts.get(pid, 0)
+        auth = "öppet" if meta["auth"] == "open" else "konto krävs"
+        lines.append(
+            f"- **{meta['name']}** [{pid}]: {n} upphandlingar i DB. "
+            f"Att ansöka: {auth}. URL: {meta['url']}"
+        )
+    lines.append("")
+    lines.append("**Planerade (ännu inte implementerade):**")
+    for pid, meta in PROVIDERS.items():
+        if meta["data_status"] == "live":
+            continue
+        lines.append(f"- {meta['name']} [{pid}] — auth: {meta['auth']}, status: {meta['data_status']}")
+    lines.append("")
+    lines.append("**Viktigt:** Att *läsa* data är alltid gratis. Att *ansöka* kräver ofta konto hos plattformen.")
+    return [types.TextContent(type="text", text="\n".join(lines))]
+
+
+async def _list_regions(conn, args: dict) -> list[types.Content]:
+    rows = conn.execute(
+        "SELECT region, COUNT(*) AS n FROM tenders "
+        "WHERE region IS NOT NULL AND region != '' "
+        "GROUP BY region ORDER BY n DESC LIMIT 30"
+    ).fetchall()
+    text = "**Regioner (län) i databasen:**\n\n"
+    for region, n in rows:
+        text += f"- {region}: {n}\n"
+    if not rows:
+        text += "(inga ännu)\n"
+    text += "\nFör kommuner: search_tenders med authority='Stockholms kommun' (t.ex)."
+    return [types.TextContent(type="text", text=text)]
+
+
+async def _sync_now(args: dict) -> list[types.Content]:
+    try:
+        subprocess.Popen(
+            ["python", "-m", "scraper.orchestrator"],
+            cwd="/app",
+            stdout=open("/var/log/opentender.log", "a"),
+            stderr=subprocess.STDOUT,
+        )
+        return [types.TextContent(
+            type="text",
+            text="Sync startad. Vänta ~60-90s, kör sedan get_stats för att se uppdaterade counts."
+        )]
+    except FileNotFoundError:
+        return [types.TextContent(
+            type="text",
+            text="Sync kunde inte startas — kör utanför Docker-containern? Starta manuellt med: python -m scraper.orchestrator"
+        )]
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"Fel vid sync: {e}")]
+
+
+
+async def _list_cpv_top(conn, args: dict) -> list[types.Content]:
+    """Top CPV codes in the DB. Since cpv_codes is a JSON list, we extract
+    each one and count occurrences."""
+    rows = conn.execute(
+        "SELECT cpv_codes FROM tenders WHERE cpv_codes IS NOT NULL AND cpv_codes != ''"
+    ).fetchall()
+    from collections import Counter
+    counts: Counter = Counter()
+    for r in rows:
+        try:
+            cpvs = json.loads(r[0])
+            for c in cpvs:
+                counts[c] += 1
+        except Exception:
+            pass
+
+    prefix = args.get("prefix", "")
+    if prefix:
+        counts = Counter({k: v for k, v in counts.items() if k.startswith(prefix)})
+
+    top = min(args.get("top", 15), 50)
+    items = counts.most_common(top)
+    if not items:
+        return [types.TextContent(type="text", text="Inga CPV-koder hittades.")]
+    lines = [f"**Top {len(items)} CPV-koder**" + (f" (prefix='{prefix}')" if prefix else "") + ":"]
+    for code, n in items:
+        lines.append(f"- `{code}`: {n} upphandlingar")
+    return [types.TextContent(type="text", text="\n".join(lines))]
+
+
+async def _get_authority(conn, args: dict) -> list[types.Content]:
+    name = args.get("name")
+    if not name:
+        return [types.TextContent(type="text", text="Missing 'name'.")]
+    where = ["authority LIKE ?"]
+    params = [f"%{name}%"]
+    if args.get("open_only", False):
+        where.append("(deadline IS NULL OR deadline > ?)")
+        params.append(datetime.now().isoformat(timespec="seconds"))
+    where_sql = "WHERE " + " AND ".join(where)
+    limit = min(args.get("limit", 20), 100)
+    rows = conn.execute(
+        f"""
+        SELECT id, source_system, tender_url, title, deadline, value, region, cpv_codes
+        FROM tenders {where_sql}
+        ORDER BY
+            CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+            deadline ASC NULLS LAST
+        LIMIT ?
+        """,
+        params + [limit],
+    ).fetchall()
+    items = [_row_dict(r) for r in rows]
+    if not items:
+        return [types.TextContent(type="text", text=f"Inga upphandlingar hittades för '{name}'. Försök kortare namn.")]
+
+    lines = [f"**{len(items)} upphandlingar från '{name}':**", ""]
+    for t in items:
+        deadline = t.get("deadline", "")
+        days = _days_until(deadline)
+        if days is not None:
+            if days < 0:
+                d_str = f"stängd {abs(days)}d sedan"
+            else:
+                d_str = f"{days}d kvar"
+        else:
+            d_str = "—"
+        value = f"{t['value']:,.0f} SEK" if t.get("value") else "—"
+        lines.append(f"- [{t['id']}] {t.get('title','(utan titel)')[:80]} ({d_str}, {value})")
+    return [types.TextContent(type="text", text="\n".join(lines))]
+
+
+async def _match_profile(conn, args: dict) -> list[types.Content]:
+    """Match tenders against a profile: keywords (any-match) + CPV prefixes + regions."""
+    where = []
+    params: list = []
+
+    keywords = args.get("keywords", [])
+    if keywords:
+        kw_ors = " OR ".join(["(title LIKE ? OR description LIKE ?)" for _ in keywords])
+        where.append(f"({kw_ors})")
+        for kw in keywords:
+            params.extend([f"%{kw}%", f"%{kw}%"])
+
+    cpv_prefixes = args.get("cpv_prefixes", [])
+    if cpv_prefixes:
+        cpv_ors = " OR ".join(["cpv_codes LIKE ?" for _ in cpv_prefixes])
+        where.append(f"({cpv_ors})")
+        for pfx in cpv_prefixes:
+            params.append(f'%"{pfx}')
+
+    regions = args.get("regions", [])
+    if regions:
+        reg_ands = " AND ".join(["region LIKE ?" for _ in regions])
+        where.append(f"({reg_ands})")
+        for r in regions:
+            params.append(f"%{r}%")
+
+    if args.get("open_only", True):
+        where.append("(deadline IS NULL OR deadline > ?)")
+        params.append(datetime.now().isoformat(timespec="seconds"))
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    limit = min(args.get("limit", 20), 50)
+    rows = conn.execute(
+        f"""
+        SELECT id, source_system, tender_url, title, authority, deadline, value, region, cpv_codes
+        FROM tenders {where_sql}
+        ORDER BY
+            CASE WHEN deadline IS NULL THEN 1 ELSE 0 END,
+            deadline ASC NULLS LAST
+        LIMIT ?
+        """,
+        params + [limit],
+    ).fetchall()
+    items = [_row_dict(r) for r in rows]
+    if not items:
+        profile_str = ", ".join(filter(None, [
+            f"keywords={keywords}" if keywords else "",
+            f"cpv={cpv_prefixes}" if cpv_prefixes else "",
+            f"regions={regions}" if regions else "",
+        ]))
+        return [types.TextContent(type="text", text=f"Inga matchande upphandlingar för {profile_str}.")]
+
+    header = f"**{len(items)} matchande upphandlingar** (profil: {args})"
+    body = "\n\n---\n\n".join(_format_tender(t) for t in items)
+    return [types.TextContent(type="text", text=f"{header}\n\n{body}")]
+
+
+
+# ----- Entry point ----------------------------------------------------------
+
+async def main():
+    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream,
+            write_stream,
+            server.create_initialization_options(),
+        )
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

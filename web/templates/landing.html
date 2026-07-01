@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Svenska upphandlingar — fri tillgång{% endblock %}
+
+{% block content %}
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+
+  <div class="hero-flag">
+    <svg width="24" height="15" class="flag-svg" viewBox="0 0 16 10" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sveriges flagga">
+      <rect width="16" height="10" fill="#006aa7"/>
+      <rect y="4" width="16" height="2" fill="#fecc00"/>
+      <rect x="5" width="2" height="10" fill="#fecc00"/>
+    </svg>
+    <span class="tag">Infrastruktur för demokrati</span>
+  </div>
+
+  <h1>
+    Svenska upphandlingar.<br>
+    <span class="accent">Öppna för alla.</span>
+  </h1>
+
+  <p class="lead">
+    OpenTender samlar svenska offentliga upphandlingar från Mercell, TED EU och fler källor. Sök direkt här på webben — eller låt din AI-assistent göra det åt dig. Ingen inloggning, inga betalväggar.
+  </p>
+
+  <div class="hero-cta">
+    <a href="/browse" class="btn primary large">Utforska upphandlingar →</a>
+    <a href="/agenter" class="btn large">Agenter</a>
+    <a href="https://github.com/magnusfroste/opentender" class="btn ghost large" target="_blank" rel="noopener">Källkod ↗</a>
+  </div>
+
+  <!-- Stadshus-illustration (pure SVG, sommar) -->
+  <div class="hero-scene" aria-hidden="true">
+    <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg" class="stadshus-svg">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#7dd3fc"/>
+          <stop offset="0.6" stop-color="#bae6fd"/>
+          <stop offset="1" stop-color="#e0f2fe"/>
+        </linearGradient>
+        <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#0284c7" stop-opacity="0.6"/>
+          <stop offset="1" stop-color="#0c4a6e" stop-opacity="0.3"/>
+        </linearGradient>
+        <linearGradient id="bldg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fbbf24" stop-opacity="0.9"/>
+          <stop offset="0.5" stop-color="#f59e0b" stop-opacity="0.8"/>
+          <stop offset="1" stop-color="#d97706" stop-opacity="0.7"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Sky -->
+      <rect width="800" height="180" fill="url(#sky)"/>
+
+      <!-- Sun -->
+      <circle cx="680" cy="60" r="28" fill="#fef08a" opacity="0.8"/>
+      <circle cx="680" cy="60" r="18" fill="#fde047" opacity="0.9"/>
+
+      <!-- Clouds -->
+      <ellipse cx="120" cy="50" rx="40" ry="12" fill="white" opacity="0.7"/>
+      <ellipse cx="140" cy="45" rx="30" ry="10" fill="white" opacity="0.6"/>
+      <ellipse cx="500" cy="35" rx="50" ry="14" fill="white" opacity="0.5"/>
+      <ellipse cx="530" cy="30" rx="35" ry="11" fill="white" opacity="0.4"/>
+
+      <!-- Water -->
+      <rect y="180" width="800" height="100" fill="url(#water)"/>
+
+      <!-- Water reflections -->
+      <line x1="0" y1="195" x2="800" y2="195" stroke="#0ea5e9" stroke-width="0.5" opacity="0.3"/>
+      <line x1="0" y1="210" x2="800" y2="210" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+      <line x1="0" y1="225" x2="800" y2="225" stroke="#0ea5e9" stroke-width="0.5" opacity="0.15"/>
+
+      <!-- Stadshuset silhouette (simplified, iconic) -->
+      <g transform="translate(280, 60)">
+        <!-- Main body -->
+        <rect x="0" y="40" width="240" height="80" fill="url(#bldg)"/>
+
+        <!-- Central tower -->
+        <rect x="100" y="0" width="40" height="120" fill="url(#bldg)"/>
+        <!-- Tower top (triangular) -->
+        <polygon points="100,0 140,0 120,-20" fill="#b45309"/>
+        <!-- Tower crown -->
+        <circle cx="120" cy="-25" r="5" fill="#92400e"/>
+        <line x1="120" y1="-30" x2="120" y2="-45" stroke="#92400e" stroke-width="2"/>
+
+        <!-- Swedish flag on tower -->
+        <g transform="translate(120, -45)">
+          <rect width="24" height="16" fill="#006aa7"/>
+          <rect y="6" width="24" height="4" fill="#fecc00"/>
+          <rect x="8" width="4" height="16" fill="#fecc00"/>
+        </g>
+
+        <!-- Windows (simplified rows) -->
+        <g fill="#78350f" opacity="0.6">
+          <rect x="15" y="55" width="10" height="15"/>
+          <rect x="35" y="55" width="10" height="15"/>
+          <rect x="55" y="55" width="10" height="15"/>
+          <rect x="75" y="55" width="10" height="15"/>
+          <rect x="155" y="55" width="10" height="15"/>
+          <rect x="175" y="55" width="10" height="15"/>
+          <rect x="195" y="55" width="10" height="15"/>
+          <rect x="215" y="55" width="10" height="15"/>
+          <rect x="15" y="80" width="10" height="15"/>
+          <rect x="35" y="80" width="10" height="15"/>
+          <rect x="55" y="80" width="10" height="15"/>
+          <rect x="75" y="80" width="10" height="15"/>
+          <rect x="155" y="80" width="10" height="15"/>
+          <rect x="175" y="80" width="10" height="15"/>
+          <rect x="195" y="80" width="10" height="15"/>
+          <rect x="215" y="80" width="10" height="15"/>
+          <!-- Tower windows -->
+          <rect x="112" y="20" width="16" height="12"/>
+          <rect x="112" y="45" width="16" height="12"/>
+          <rect x="112" y="70" width="16" height="12"/>
+        </g>
+
+        <!-- Arcade (ground floor arches) -->
+        <g fill="#92400e" opacity="0.5">
+          <path d="M10,120 Q20,105 30,120" fill="none" stroke="#92400e" stroke-width="2"/>
+          <path d="M40,120 Q50,105 60,120" fill="none" stroke="#92400e" stroke-width="2"/>
+          <path d="M70,120 Q80,105 90,120" fill="none" stroke="#92400e" stroke-width="2"/>
+          <path d="M150,120 Q160,105 170,120" fill="none" stroke="#92400e" stroke-width="2"/>
+          <path d="M180,120 Q190,105 200,120" fill="none" stroke="#92400e" stroke-width="2"/>
+          <path d="M210,120 Q220,105 230,120" fill="none" stroke="#92400e" stroke-width="2"/>
+        </g>
+
+        <!-- Reflection in water -->
+        <g transform="translate(0, 120) scale(1, -0.4) translate(0, -120)" opacity="0.15">
+          <rect x="0" y="40" width="240" height="80" fill="url(#bldg)"/>
+          <rect x="100" y="0" width="40" height="120" fill="url(#bldg)"/>
+          <polygon points="100,0 140,0 120,-20" fill="#b45309"/>
+        </g>
+      </g>
+
+      <!-- Trees on the shore -->
+      <g transform="translate(80, 130)">
+        <circle cx="0" cy="10" r="20" fill="#16a34a" opacity="0.7"/>
+        <circle cx="15" cy="5" r="15" fill="#22c55e" opacity="0.6"/>
+        <rect x="-2" y="20" width="4" height="15" fill="#78350f"/>
+      </g>
+      <g transform="translate(620, 130)">
+        <circle cx="0" cy="10" r="18" fill="#16a34a" opacity="0.7"/>
+        <circle cx="-12" cy="5" r="12" fill="#22c55e" opacity="0.6"/>
+        <rect x="-2" y="20" width="4" height="15" fill="#78350f"/>
+      </g>
+      <g transform="translate(680, 135)">
+        <circle cx="0" cy="8" r="14" fill="#16a34a" opacity="0.6"/>
+        <rect x="-2" y="15" width="4" height="12" fill="#78350f"/>
+      </g>
+
+      <!-- Birds -->
+      <path d="M200,40 Q205,35 210,40 Q215,35 220,40" fill="none" stroke="#475569" stroke-width="1.5" opacity="0.5"/>
+      <path d="M250,55 Q255,50 260,55 Q265,50 270,55" fill="none" stroke="#475569" stroke-width="1.5" opacity="0.4"/>
+    </svg>
+  </div>
+
+  <div class="hero-mission">
+    <p>
+      <strong>Att söka är alltid gratis.</strong> För vissa upphandlingar behöver du skapa konto hos plattformen (Mercell, Tendsign, e-Avrop, etc.) för att komma åt anbudsformulär och dokument.
+      <a href="/providers">Se vilka källor som kräver konto →</a>
+    </p>
+    <p class="mission-statement">
+      <strong>Vårt uppdrag:</strong> göra det enklare för svenska företag — särskilt småföretag — att hitta och offerera offentliga upphandlingar.
+      Öppna data, öppen kod, öppen matchning. Inte för att konkurrera med plattformarna, utan för att hjälpa marknaden fungera bättre.
+      <a href="/providers">Se hela ekosystemet vi är en del av →</a>
+    </p>
+  </div>
+</section>
+
+<!-- KPIs / live stats -->
+{% if total %}
+<section>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="v">{{ "{:,}".format(total).replace(",", " ") }}</div>
+      <div class="l">Upphandlingar i databasen</div>
+    </div>
+    <div class="kpi {% if open_count > 0 %}green{% endif %}">
+      <div class="v">{{ open_count }}</div>
+      <div class="l">Öppna just nu</div>
+    </div>
+    <div class="kpi">
+      <div class="v">{{ source_count }}</div>
+      <div class="l">Datakällor</div>
+    </div>
+    <div class="kpi">
+      <div class="v">{{ region_count }}</div>
+      <div class="l">Regioner</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- FRESH TENDERS -->
+{% if recent_tenders %}
+<section>
+  <div class="flex between items-center mb-2">
+    <h2 style="margin: 0;">Senaste upphandlingar</h2>
+    <a href="/browse?sort=newest" class="muted">Visa alla →</a>
+  </div>
+  <div class="cards">
+    {% for t in recent_tenders %}
+    <a class="card-tender" href="/tenders/{{ t.id }}">
+      <div class="top-row">
+        <h3>{{ t.title or "(utan titel)" }}</h3>
+        <div class="right">
+          {% if t.deadline %}
+          <div class="deadline {% if t.days_until is not none and t.days_until < 3 %}urgent{% elif t.days_until is not none and t.days_until < 0 %}closed{% endif %}">
+            {{ t.deadline[:10] }}
+            {% if t.days_until is not none %}
+              {% if t.days_until < 0 %}(stängd)
+              {% elif t.days_until == 0 %}(idag)
+              {% elif t.days_until == 1 %}(imorgon)
+              {% else %}({{ t.days_until }} dagar)
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if t.value %}<div class="value">{{ "{:,}".format(t.value).replace(",", " ") }} SEK</div>{% endif %}
+        </div>
+      </div>
+      <div class="meta">
+        <span>🏛️ {{ t.authority or "—" }}</span>
+        <span>📍 {{ t.region or "—" }}</span>
+        <span>📅 {{ t.published_at[:10] if t.published_at else "—" }}</span>
+        <span class="badge badge-source">{{ t.source_system }}</span>
+        {% for cpv in (t.cpv_codes or [])[:2] %}
+        <span class="chip">{{ cpv }}</span>
+        {% endfor %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="text-center mt-2">
+    <a href="/browse" class="btn primary">Se alla {{ total }} upphandlingar</a>
+  </div>
+</section>
+{% else %}
+<section class="empty">
+  <div class="icon">📭</div>
+  <p>Databasen är tom. Kör en synk för att hämta upphandlingar.</p>
+  <button id="empty-sync" class="btn primary">Kör första synken</button>
+</section>
+{% endif %}
+
+
+
+<!-- FOR DEVELOPERS -->
+<section class="card code-snippet">
+  <h2 style="margin-top: 0;">Bygg ovanpå</h2>
+  <p class="muted">Tre sätt att komma åt datan:</p>
+
+  <h3>Webbläsare</h3>
+  <p><a href="/browse">/browse</a> — sök, filtrera, klicka för detaljer.</p>
+
+  <h3>REST API</h3>
+  <pre><code>curl https://&lt;host&gt;/api/tenders?source=mercell&q=it-konsult</code></pre>
+  <p><a href="/agenter">Full API-dokumentation →</a></p>
+
+  <h3>MCP (för AI-agenter)</h3>
+  <pre><code>{
+  "mcpServers": {
+    "opentender": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "/path/to/opentender"
+    }
+  }
+}</code></pre>
+  <p><a href="https://github.com/magnusfroste/opentender/blob/main/MCP.md" target="_blank" rel="noopener">MCP-setup-guide ↗</a></p>
+</section>
+
+
+<!-- MINI INSIGHT (links to dashboard) -->
+{% if top_authorities %}
+<section>
+  <div class="flex between items-center mb-2">
+    <h2 style="margin: 0;">Vem upphandlar mest?</h2>
+    <a href="/dashboard" class="muted">Fler insikter →</a>
+  </div>
+  <div class="mini-chart">
+    {% for a in top_authorities[:5] %}
+    <div class="mini-bar-row">
+      <span class="mini-bar-label">{{ a.authority[:25] }}</span>
+      <div class="mini-bar-track">
+        <div class="mini-bar-fill" style="width: {{ a.pct }}%"></div>
+      </div>
+      <span class="mini-bar-value">{{ a.n }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <a href="/dashboard" class="btn ghost" style="margin-top: 1rem;">Se alla insikter →</a>
+</section>
+{% endif %}
+
+<!-- CTA -->
+<section class="hero-cta-section">
+  <h2>Börja utforska</h2>
+  <p class="muted">{{ total }} upphandlingar från {{ source_count }} källor. Allt gratis.</p>
+  <a href="/browse" class="btn primary large">Utforska upphandlingar →</a>
+</section>
+
+<script>
+  document.getElementById("empty-sync")?.addEventListener("click", async () => {
+    const btn = document.getElementById("empty-sync");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Startar...';
+    try {
+      const r = await fetch("/api/sync", { method: "POST" });
+      if (r.status === 202) {
+        btn.textContent = "Startad — laddar om om 60s";
+        setTimeout(() => location.reload(), 60000);
+      } else {
+        btn.textContent = "Kunde inte starta";
+        btn.disabled = false;
+      }
+    } catch (e) {
+      btn.textContent = "Fel: " + e;
+      btn.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

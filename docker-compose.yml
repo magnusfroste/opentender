@@ -1,0 +1,29 @@
+#
+# docker-compose.yml — OpenTender on Easypanel
+#
+# One container: FastAPI serves dashboard + API, cron triggers scrapers.
+# SQLite + sync logs persist in /data (mounted as a Docker volume).
+# Traefik (managed by Easypanel) terminates HTTPS for us.
+#
+# IMPORTANT: We use `expose:` instead of `ports:` so Easypanel's auto-generated
+# override doesn't try to bind 127.0.0.1:8080 on the host (which is often
+# already taken by Traefik itself or a previous container). Traefik reaches
+# the container via the Docker network using container port 8080 directly.
+#
+services:
+  app:
+    build: .
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/opentender.db
+      - USER_AGENT=${USER_AGENT:-opentender/0.1}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Schedule for the in-container cron (any valid crontab expression)
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 6 * * *}
+      # Scraper toggles — set to "false" to skip a source
+      - SCRAPE_MERCELL=${SCRAPE_MERCELL:-true}
+      - SCRAPE_TED=${SCRAPE_TED:-true}
+    restart: unless-stopped
