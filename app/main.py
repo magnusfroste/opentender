@@ -507,11 +507,12 @@ No API key required.""",
                 ),
                 make(
                     id="ted",
-                    name="TED EU (Tenders Electronic Daily)",
+                    name="TED EU — Contract Notices",
                     status="live",
                     description="EU-kommissionens officiella databas för upphandlingar "
-                                "över EU-tröskelvärden. Vi filtrerar på Sverige (CY=SWE) och "
-                                "de senaste 30 dagarna.",
+                                "över EU-tröskelvärden. Vi filtrerar på Sverige (buyer-country=SWE) "
+                                "och hämtar öppna upphandlingar (notice-subtype 7, 29). "
+                                "Svarar på frågan: \"Vad kan jag lägga anbud på?\"",
                     method="REST POST",
                     method_note="(JSON body med query + fields + filters)",
                     url_pattern="https://api.ted.europa.eu/v3/notices/search",
@@ -521,6 +522,41 @@ Body: {"query": "buyer-country = SWE AND publication-date >= 20260101",
        "fields": [...], "limit": 100, "page": 1}
 Returns notice metadata. Only covers EU-threshold procurements,
 not all Swedish tenders. Polite User-Agent required.""",
+                ),
+                make(
+                    id="ted_awards",
+                    name="TED EU — Contract Awards",
+                    status="live",
+                    description="Tilldelningsbeslut från TED — visar VILKA kontrakt som "
+                                "redan har tilldelats, till vem och till vilket värde. "
+                                "Marknadsintelligence för småföretag: \"Vem vann senast?\" "
+                                "notice-subtypes 16–19 (standard, sectoral, concessions, defence).",
+                    method="REST POST",
+                    method_note="(samma API som ted, annan subtype-filter)",
+                    url_pattern="https://api.ted.europa.eu/v3/notices/search",
+                    requires_auth="Nej",
+                    technical="""POST /v3/notices/search
+Body: {"query": "buyer-country = SWE AND notice-subtype = \\"16\\" OR \\"17\\" ...",
+       "fields": ["winner-name", "result-value-lot", ...]}
+Winner fields are requested but often empty in search results —
+full data lives in the notice XML body. ~18k SWE awards/year.""",
+                ),
+                make(
+                    id="ted_pin",
+                    name="TED EU — Prior Information Notices",
+                    status="live",
+                    description="Förhandsinformation om kommande upphandlingar. "
+                                "Myndigheter meddelar att de PLANERAR att upphandla — "
+                                "innan formell annons publiceras. Tidigast möjliga signal "
+                                "för småföretag att förbereda sig. notice-subtypes 4, 5, 25, 26.",
+                    method="REST POST",
+                    method_note="(samma API, subtype-filter för PIN)",
+                    url_pattern="https://api.ted.europa.eu/v3/notices/search",
+                    requires_auth="Nej",
+                    technical="""POST /v3/notices/search
+Body: {"query": "buyer-country = SWE AND notice-subtype = \\"4\\" OR \\"5\\" ...",
+       "fields": ["estimated-value-lot", "future-notice", ...]}
+~1k SWE PINs/year. Low volume but high strategic value.""",
                 ),
             ]
 

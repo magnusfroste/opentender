@@ -16,7 +16,7 @@ import os
 import time
 from typing import Callable
 
-from . import mercell, ted
+from . import mercell, ted, ted_awards, ted_pin
 
 LOG = logging.getLogger(__name__)
 
@@ -28,8 +28,10 @@ def _truthy(val: str | None) -> bool:
 def _registry() -> list[tuple[str, bool, Callable[[str], int]]]:
     """Return [(name, enabled, fn), ...] in scrape order."""
     return [
-        ("mercell", _truthy(os.environ.get("SCRAPE_MERCELL", "true")), mercell.run),
-        ("ted",     _truthy(os.environ.get("SCRAPE_TED",     "true")), ted.run),
+        ("mercell",     _truthy(os.environ.get("SCRAPE_MERCELL", "true")), mercell.run),
+        ("ted",         _truthy(os.environ.get("SCRAPE_TED", "true")),     ted.run),
+        ("ted_awards",  _truthy(os.environ.get("SCRAPE_TED_AWARDS", "true")),  ted_awards.run),
+        ("ted_pin",     _truthy(os.environ.get("SCRAPE_TED_PIN", "true")),     ted_pin.run),
     ]
 
 
@@ -42,9 +44,12 @@ def run_all(db_path: str) -> dict:
             LOG.info("skipping %s (disabled via env)", name)
             continue
         try:
-            if name == "ted":
-                # TED supports configurable lookback via env
-                lookback = int(os.environ.get("TED_LOOKBACK_DAYS", "30"))
+            if name in ("ted", "ted_awards", "ted_pin"):
+                lookback = int(os.environ.get(
+                    "TED_LOOKBACK_DAYS" if name == "ted" else
+                    f"TED_{name.split('_')[1].upper()}_LOOKBACK_DAYS",
+                    "30" if name == "ted" else "90",
+                ))
                 n = fn(db_path, lookback_days=lookback)
             else:
                 n = fn(db_path)

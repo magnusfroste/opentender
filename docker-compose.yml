@@ -26,4 +26,6 @@ services:
       # Scraper toggles — set to "false" to skip a source
       - SCRAPE_MERCELL=${SCRAPE_MERCELL:-true}
       - SCRAPE_TED=${SCRAPE_TED:-true}
+      - SCRAPE_TED_AWARDS=${SCRAPE_TED_AWARDS:-true}
+      - SCRAPE_TED_PIN=${SCRAPE_TED_PIN:-true}
     restart: unless-stopped
