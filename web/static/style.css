@@ -1312,6 +1312,7 @@ pre code {
 /* CHIPS */
 .chip { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: var(--surface-2); color: var(--muted); }
 .chip-cpv { font-family: monospace; }
+.chip-doctype { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 
 /* PAGINATION */
 .pagination {

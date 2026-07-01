@@ -118,6 +118,9 @@
 
           <div class="tender-meta-row">
             <span class="badge badge-source">{{ t.source_system }}</span>
+            {% if t.document_type and t.document_type not in ['', 'Contract Notice', 'Standard Notice'] %}
+            <span class="chip chip-doctype">{{ t.document_type }}</span>
+            {% endif %}
             {% if t.procedure %}<span class="chip">{{ t.procedure }}</span>{% endif %}
             {% for cpv in (t.cpv_codes_list or [])[:3] %}
             <span class="chip chip-cpv">{{ cpv }}</span>

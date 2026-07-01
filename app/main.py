@@ -38,6 +38,30 @@ def _num(n) -> str:
     return f"{int(n):,}".replace(",", " ")
 
 
+import re as _re
+
+def _parse_days_until(deadline: str | None, now: datetime) -> int | None:
+    """Parse a deadline string into days remaining, robust to TED's date formats.
+
+    TED returns dates like '2026-09-18+02:00' (date + offset, no time),
+    '2026-06-04Z' (date + Z), or '2026-09-18T23:59:00Z'.
+    Standard datetime.fromisoformat() chokes on the first two in Python < 3.11.
+    """
+    if not deadline:
+        return None
+    s = str(deadline).strip()[:25]
+    # Normalise: strip the timezone offset to parse as naive date, then
+    # compare date-only (we don't need hour-level precision for "Xd kvar")
+    m = _re.match(r"(\d{4}-\d{2}-\d{2})", s)
+    if not m:
+        return None
+    try:
+        d = datetime.strptime(m.group(1), "%Y-%m-%d")
+        return (d - now.replace(tzinfo=None)).days
+    except Exception:
+        return None
+
+
 def create_app(db_path: Optional[str] = None) -> FastAPI:
     db = db_path or DB_PATH
     try:
@@ -97,14 +121,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
                     except Exception:
                         t["cpv_codes"] = []
                 # days_until
-                if t.get("deadline"):
-                    try:
-                        dt = datetime.fromisoformat(t["deadline"][:19])
-                        t["days_until"] = (dt - now).days
-                    except Exception:
-                        t["days_until"] = None
-                else:
-                    t["days_until"] = None
+                t["days_until"] = _parse_days_until(t.get("deadline"), now)
                 recent.append(t)
             # Top 5 authorities for mini chart
             top_auth = conn.execute(
@@ -162,11 +179,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
             closing_soon = None
             if closing_row:
                 c = dict(closing_row)
-                try:
-                    dt = datetime.fromisoformat(str(c["deadline"])[:19])
-                    c["days"] = max(0, (dt - now).days)
-                except Exception:
-                    c["days"] = 0
+                c["days"] = max(0, _parse_days_until(c.get("deadline"), now) or 0)
                 closing_soon = c
 
             # Authority count
@@ -251,11 +264,16 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
                 "SELECT deadline FROM tenders WHERE deadline IS NOT NULL AND deadline != ''"
             ).fetchall()
             for r in dl_rows:
-                try:
-                    dt = datetime.fromisoformat(str(r["deadline"])[:19])
-                    weekday_counts[dt.weekday()] += 1
-                except Exception:
-                    pass
+                d = _parse_days_until(str(r["deadline"]), now)
+                if d is not None:
+                    # Parse the actual date to get weekday
+                    m = _re.match(r"(\d{4}-\d{2}-\d{2})", str(r["deadline"]))
+                    if m:
+                        try:
+                            dt = datetime.strptime(m.group(1), "%Y-%m-%d")
+                            weekday_counts[dt.weekday()] += 1
+                        except Exception:
+                            pass
             max_wd = max(weekday_counts) or 1
             deadline_weekday = [
                 {"day": weekday_names[i], "n": weekday_counts[i], "pct": int(weekday_counts[i] / max_wd * 100)}
@@ -270,14 +288,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
             recent_tenders = []
             for r in recent_rows:
                 t = dict(r)
-                if t.get("deadline"):
-                    try:
-                        dt = datetime.fromisoformat(str(t["deadline"])[:19])
-                        t["days_until"] = (dt - now).days
-                    except Exception:
-                        t["days_until"] = None
-                else:
-                    t["days_until"] = None
+                t["days_until"] = _parse_days_until(t.get("deadline"), now)
                 recent_tenders.append(t)
 
             # Sync logs
@@ -369,7 +380,8 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
             rows = conn.execute(
                 f"""
                 SELECT id, source_system, title, authority, region, deadline,
-                       published_at, value, cpv_codes, procedure, tender_url
+                       published_at, value, cpv_codes, procedure, tender_url,
+                       document_type
                 FROM tenders {where_sql}
                 ORDER BY {order_by}
                 LIMIT ? OFFSET ?
@@ -384,14 +396,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
                         item["cpv_codes_list"] = json.loads(item["cpv_codes"])
                     except Exception:
                         item["cpv_codes_list"] = []
-                if item.get("deadline"):
-                    try:
-                        dt = datetime.fromisoformat(str(item["deadline"])[:19])
-                        item["days_until"] = (dt - now).days
-                    except Exception:
-                        item["days_until"] = None
-                else:
-                    item["days_until"] = None
+                item["days_until"] = _parse_days_until(item.get("deadline"), now)
 
             sources = conn.execute(
                 "SELECT source_system, COUNT(*) as count FROM tenders GROUP BY source_system ORDER BY count DESC"
@@ -429,14 +434,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
             else:
                 d["cpv_codes_list"] = []
             # Days until deadline
-            if d.get("deadline"):
-                try:
-                    dt = datetime.fromisoformat(str(d["deadline"])[:19])
-                    d["days_until"] = (dt - datetime.now(timezone.utc)).days
-                except Exception:
-                    d["days_until"] = None
-            else:
-                d["days_until"] = None
+            d["days_until"] = _parse_days_until(d.get("deadline"), datetime.now(timezone.utc))
             # Pretty raw_json
             raw = d.get("raw_json", "")
             try:
